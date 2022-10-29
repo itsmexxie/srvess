@@ -1,0 +1,11 @@
+# Node
+**/node_modules
+
+# Build artifacts
+**/out
+
+# Databases
+**/*.sqlite
+
+# Secrets
+**/.env

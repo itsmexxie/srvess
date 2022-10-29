@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"target": "ES2016",
+		"module": "ES2022",
+		"moduleResolution": "node",
+		"sourceMap": true,
+		"outDir": "./out",
+		"removeComments": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"skipLibCheck": true
+	},
+	"include": [
+		"./src/**/*.ts"
+, "src/commands/voting.ts-old"	]
+}
