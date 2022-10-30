@@ -11,7 +11,7 @@ import { Command } from "./types.js";
 LuxonSettings.defaultZone = "UTC";
 
 const client = new discord.Client({ intents: [discord.GatewayIntentBits.Guilds] });
-const rest = new discord.REST({ version: "10" }).setToken(process.env.BOT_TOKEN as string);
+const rest = new discord.REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN as string);
 let commands: discord.Collection<string, Command> = new discord.Collection();
 
 async function chatInputCommandHandler(interaction: discord.ChatInputCommandInteraction) {
@@ -52,6 +52,6 @@ client.once(discord.Events.ClientReady, (c) => {
 async function main() {
 	commands = await CommandManager.loadCommands();
 	await CommandManager.registerCommands(commands, rest);
-	client.login(process.env.BOT_TOKEN);
+	client.login(process.env.DISCORD_BOT_TOKEN);
 }
 main();

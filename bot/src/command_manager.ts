@@ -23,7 +23,7 @@ async function loadCommands() {
 async function registerCommands(commands: discord.Collection<string, Command>, rest: discord.REST) {
 	try {
 		fmtLog("INFO", `Refreshing ${commands.size} application commands...`)
-		const data = await rest.put(discord.Routes.applicationCommands(process.env.CLIENT_ID as string), { body: commands.map(c => c.data) }) as [];
+		const data = await rest.put(discord.Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID as string, "730853059374350348"), { body: commands.map(c => c.data) }) as [];
 		fmtLog("INFO", `Successfully refreshed ${data.length} application command(s)!`);
 	} catch(err) {
 		fmtLog("ERROR", err as string);
