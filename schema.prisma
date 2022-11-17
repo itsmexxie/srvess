@@ -8,8 +8,9 @@ datasource db {
 }
 
 model User {
-    id    String @id
-    votes Vote[]
+    id        String @id
+    discordId String @unique
+    votes     Vote[]
 }
 
 model Guild {
@@ -43,9 +44,9 @@ model VotingOption {
 }
 
 model Vote {
-    user            User          @relation(fields: [userId], references: [id])
+    user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
     userId          String
-    votingSession   VotingSession @relation(fields: [votingSessionId], references: [id])
+    votingSession   VotingSession @relation(fields: [votingSessionId], references: [id], onDelete: Cascade)
     votingSessionId String
     votingOption    VotingOption  @relation(fields: [votingOptionId], references: [id])
     votingOptionId  String

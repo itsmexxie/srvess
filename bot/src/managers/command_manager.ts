@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import discord from "discord.js";
-import { fmtLog } from "./utils.js";
-import { Command } from "./types.js";
+import { fmtLog } from "../utils.js";
+import { Command } from "../types.js";
+
+const commands: discord.Collection<string, Command> = new discord.Collection();
 
 async function loadCommands() {
-	const commands: discord.Collection<string, Command> = new discord.Collection();
-
-	let cmdFiles = fs.readdirSync(path.resolve("out", "commands")).filter(file => file.endsWith(".js"));
+	const cmdFiles = fs.readdirSync(path.resolve("out", "commands")).filter(file => file.endsWith(".js"));
 	for(const file of cmdFiles) {
 		const cmd = (await import(path.resolve("out", "commands", file))).default;
 		if(!("data" in cmd) || !("execute" in cmd)) {
@@ -16,11 +16,11 @@ async function loadCommands() {
 		}
 		commands.set(cmd.data.name, cmd);
 	}
-
-	return commands;
 }
 
-async function registerCommands(commands: discord.Collection<string, Command>, rest: discord.REST) {
+async function registerCommands(rest: discord.REST) {
+	if(commands.size == 0) await loadCommands();
+
 	try {
 		fmtLog("INFO", `Refreshing ${commands.size} application commands...`)
 		const data = await rest.put(discord.Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID as string, "730853059374350348"), { body: commands.map(c => c.data) }) as [];
@@ -31,6 +31,13 @@ async function registerCommands(commands: discord.Collection<string, Command>, r
 }
 
 export default {
+	commands,
+	loadCommands,
+	registerCommands
+};
+
+export {
+	commands,
 	loadCommands,
 	registerCommands
 };

@@ -1,33 +1,21 @@
-import { ChatInputCommandInteraction } from "discord.js";
+import { ButtonInteraction, ChatInputCommandInteraction, Client, Collection } from "discord.js";
 
 interface Command {
 	data: {
 		name: string,
 		description: string
 	},
-	execute(interaction: ChatInputCommandInteraction): void;
+	execute(interaction: ChatInputCommandInteraction): Promise<void>;
 };
 
-interface VotingSession {
-	id: string,
-	number: number
-	type: number,
-	name: string,
-	closed: boolean
-	createdAtTimestamp: string,
-	endsAtTimestamp: string,
-	guildId: string
-}
-
-interface VotingOption {
-	id: string,
-	index: number,
-	content: string,
-	sessionId: string
+interface Interaction {
+	data: {
+		type: string
+	},
+	handle(interaction: ChatInputCommandInteraction | ButtonInteraction, client: Client, commands?: Collection<string, Command>): Promise<void>
 }
 
 export {
 	Command,
-	VotingSession,
-	VotingOption
+	Interaction
 };

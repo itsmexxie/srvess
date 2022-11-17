@@ -4,8 +4,12 @@
 	"main": "./out/index.js",
 	"type": "module",
 	"private": true,
+	"prisma": {
+		"schema": "../schema.prisma"
+	},
 	"scripts": {
 		"start": "tsc && node .",
+		"build": "tsc",
 		"clean": "rm -rf out"
 	},
 	"devDependencies": {
@@ -22,6 +26,6 @@
 		"dotenv": "^16.0.3",
 		"express": "^4.18.2",
 		"luxon": "^3.0.4",
-		"prisma": "^4.5.0"
+		"prisma": "^4.6.1"
 	}
 }
