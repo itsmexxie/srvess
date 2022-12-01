@@ -1,9 +1,9 @@
 import discord from "discord.js";
 import DB from "../db.js";
+import EventBus from "../eventbus.js";
 import { fmtLog, fingerprintGenerator } from "../utils.js";
-import { Command } from "../types";
 
-async function handle(interaction: discord.ButtonInteraction, client: discord.Client, commands: discord.Collection<String, Command>) {
+async function handle(interaction: discord.ButtonInteraction, eventbus: EventBus) {
 	// Split to command ([0]) & arguments ([1 - end])
 	let args = interaction.customId.split("-");
 	switch(args[0]) {

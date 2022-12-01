@@ -1,21 +1,36 @@
-import { ButtonInteraction, ChatInputCommandInteraction, Client, Collection } from "discord.js";
+import { Client, ChatInputCommandInteraction, ButtonInteraction } from "discord.js";
+import EventBus from "./eventbus.js";
+
+interface Event {
+	data: {
+		name: string
+	},
+	handle(client: Client, message: EventBusMessage): Promise<void>
+}
+
+interface EventBusMessage {
+	key: string,
+	content: any
+}
 
 interface Command {
 	data: {
 		name: string,
 		description: string
 	},
-	execute(interaction: ChatInputCommandInteraction): Promise<void>;
+	execute(interaction: ChatInputCommandInteraction, eventbus: EventBus): Promise<void>
 };
 
 interface Interaction {
 	data: {
 		type: string
 	},
-	handle(interaction: ChatInputCommandInteraction | ButtonInteraction, client: Client, commands?: Collection<string, Command>): Promise<void>
+	handle(interaction: ChatInputCommandInteraction | ButtonInteraction, eventbus: EventBus): Promise<void>
 }
 
 export {
+	Event,
+	EventBusMessage,
 	Command,
 	Interaction
 };

@@ -1,5 +1,8 @@
+// Initialize environment variables
 import * as dotenv from "dotenv";
 dotenv.config();
+
+// Import modules
 import express from "express";
 import bodyParser from "body-parser";
 import { Settings as LuxonSettings } from "luxon";

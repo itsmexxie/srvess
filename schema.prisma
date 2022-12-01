@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
     provider = "sqlite"
-    url      = "file:../../database.sqlite"
+    url      = "file:database.sqlite"
 }
 
 model User {
@@ -17,6 +17,7 @@ model Guild {
     id              String          @id
     timezone        String          @default("UTC")
     votingChannelId String          @default("0")
+	votingGlyphs	String
     votingSessions  VotingSession[]
 }
 
@@ -24,7 +25,7 @@ model VotingSession {
     id                 String         @id
     number             Int
     type               Int
-    name               String
+    question           String
     options            VotingOption[]
     votes              Vote[]
     closed             Boolean        @default(false)

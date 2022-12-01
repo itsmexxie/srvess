@@ -1,14 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import discord from "discord.js";
 import { fmtLog } from "../utils.js";
 import { Interaction } from "../types";
 
-const interactions: discord.Collection<string, Interaction> = new discord.Collection();
+const interactions: Map<string, Interaction> = new Map();
 
 async function loadInteractions() {
-	const intrFiles = fs.readdirSync(path.resolve("out", "interactions")).filter(file => file.endsWith(".js"));
-	for(const file of intrFiles) {
+	for(const file of fs.readdirSync(path.resolve("out", "interactions")).filter(file => file.endsWith(".js"))) {
 		const intr = (await import(path.resolve("out", "interactions", file))).default;
 		if(!("data" in intr) || !("handle" in intr)) {
 			fmtLog("WARN", `Interaction handler ${file} is missing a required property (data, handle).`)
@@ -16,6 +14,8 @@ async function loadInteractions() {
 		}
 		interactions.set(intr.data.type, intr);
 	}
+
+	fmtLog("INFO", `Successfully loaded **${interactions.size}** interaction(s).`);
 }
 
 export default {

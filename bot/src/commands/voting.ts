@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, TextChannel, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
 import { DateTime } from "luxon";
 import DB from "../db.js";
+import EventBus from "../eventbus.js";
 import { fmtLog, fingerprintGenerator } from "../utils.js";
 
 async function listSessions(interaction: ChatInputCommandInteraction) {
@@ -13,7 +14,7 @@ async function listSessions(interaction: ChatInputCommandInteraction) {
 		let totalSessions = await DB.votingSession.count({ where: { guildId: interaction.guildId as string, closed: interaction.options.getBoolean("closed") ? undefined : false }});
 		let votingSessions = await DB.votingSession.findMany({
 			where: { guildId: interaction.guildId as string, closed: interaction.options.getBoolean("closed") ? undefined : false },
-			select: { id: true, number: true, name: true, closed: true },
+			select: { id: true, number: true, question: true, closed: true },
 			orderBy: { number: "asc" },
 			skip: currOffset,
 			take: limit
@@ -24,7 +25,7 @@ async function listSessions(interaction: ChatInputCommandInteraction) {
 			.setDescription(votingSessions.length == 0 ? "There are no previous voting sessions with the matching criteria! :(" : (votingSessions.length == 1 ? "This is the latest voting session:" : `These are the previous ${votingSessions.length} voting sessions:`))
 			.setColor(0x00AAFF)
 		for(const session of votingSessions) {
-			embed.addFields({ name: `Voting #${session.number} | ${session.closed ? "CLOSED" : "ONGOING"}`, value: session.name })
+			embed.addFields({ name: `Voting #${session.number} | ${session.closed ? "CLOSED" : "ONGOING"}`, value: session.question })
 		}
 
 		const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents([
@@ -60,57 +61,62 @@ async function listSessions(interaction: ChatInputCommandInteraction) {
 
 async function sessionInfo(interaction: ChatInputCommandInteraction) {
 	// Get guild info
-	let guild = await DB.guild.findUnique({ where: { id: interaction.guildId as string } });
+	let guild = (await DB.guild.findUnique({ where: { id: interaction.guildId as string } }))!;
 
 	// Get session info
 	let votingSession = await DB.votingSession.findFirst({
-		where: { guildId: interaction.guildId as string, number: interaction.options.getInteger("session-number") as number }
+		where: { guildId: interaction.guildId as string, number: interaction.options.getInteger("session-number") as number },
+		include: { options: true }
 	});
 	if(!votingSession) return await interaction.reply({ content: `Didn't find voting session **#${interaction.options.getInteger("session-number")}**!`, ephemeral: true });
-	let votingOptions = await DB.votingOption.findMany({
-		where: { votingSessionId: votingSession.id }
-	});
 
 	// Create message
 	const embed = new EmbedBuilder()
-		.setTitle(`Voting #${votingSession.number} INFO`)
-		.setDescription(votingSession.name)
+		.setTitle(`Voting #${votingSession.number} | INFO`)
 		.setColor(0x00AAFF)
 		.addFields([
+			{ name: "Question:", value: votingSession.question },
 			{ name: "Open?", value: votingSession.closed ? "❎" : "✅", inline: true },
-			{ name: "Created at:", value: DateTime.fromMillis(parseInt(votingSession.createdAtTimestamp), { zone: guild?.timezone }).toFormat("MMMM dd, yyyy - HH:mm"), inline: true },
+			{ name: "Created at:", value: DateTime.fromMillis(parseInt(votingSession.createdAtTimestamp), { zone: guild.timezone }).toFormat("MMMM dd, yyyy - HH:mm"), inline: true },
 			{ name: votingSession.closed ? "Ended at:" : "Ends at:", value: DateTime.fromMillis(parseInt(votingSession.endsAtTimestamp), { zone: guild?.timezone }).toFormat("MMMM dd, yyyy - HH:mm"), inline: true }
 		]);
-	let votesString = "";
+	let optionsString = "";
 	if(votingSession.closed) {
 		let totalVotes = await DB.vote.count({ where: { votingSessionId: votingSession.id } });
-		for(let i = 0; i < votingOptions.length; i++) {
-			let optionVotes = await DB.vote.count({ where: { votingSessionId: votingSession.id, votingOptionId: votingOptions[i].id } });
-			votesString += `${votingOptions[i].content} - ${optionVotes} (${totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toPrecision(3) : 0}%)`;
-			if(i != (votingOptions.length - 1)) votesString += " || ";
+		for(let i = 0; i < votingSession.options.length; i++) {
+			let optionVotes = await DB.vote.count({ where: { votingSessionId: votingSession.id, votingOptionId: votingSession.options[i].id } });
+			optionsString += `${JSON.parse(guild.votingGlyphs)[votingSession.type][i]} **${votingSession.options[i].content}** - ${optionVotes} (${totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toPrecision(3) : 0}%)`;
+			if(i != (votingSession.options.length - 1)) optionsString += "\n";
 		}
+		embed.setFooter({ text: "Wait for the session to close to see the results!"});
 	} else {
-		votesString = "Wait for the session to close to see the results!";
+		for(let i = 0; i < votingSession.options.length; i++) {
+			optionsString += `${JSON.parse(guild.votingGlyphs)[votingSession.type][i]} **${votingSession.options[i].content}**`;
+			if(i != (votingSession.options.length - 1)) optionsString += "\n";
+		}
 	}
-	embed.addFields({ name: "Options:", value: votesString });
+	embed.addFields({ name: "Options:", value: optionsString });
 
 	await interaction.reply({ embeds: [embed] });
 }
 
-async function createSession(interaction: ChatInputCommandInteraction) {
+async function createSession(interaction: ChatInputCommandInteraction, eventbus: EventBus) {
 	// Get guild info
 	let guild = (await DB.guild.findUnique({ where: { id: interaction.guildId as string } }))!;
 
 	// Check parameters
-	const requiredOptionsLength = [2, 4][parseInt(interaction.options.getString("type") as string)];
+	const requiredOptionsLength = [2, 0][parseInt(interaction.options.getString("type") as string)];
 	const rawOptions = (interaction.options.getString("options") as string).split(";;");
-	if(rawOptions.length != requiredOptionsLength) return await interaction.reply({ content: `Not enough options for the selected type! (Need ${requiredOptionsLength})`, ephemeral: true });
+	if(requiredOptionsLength != 0 && rawOptions.length != requiredOptionsLength) return await interaction.reply({ content: `Not enough options for the selected type! (Need ${requiredOptionsLength})`, ephemeral: true });
 
-	const endsAtDate = DateTime.fromISO(interaction.options.getString("ends-at-timestamp") as string, { zone: guild?.timezone });
+	// Check endsAtTimestamp
+	let endsAtDate = DateTime.fromISO(interaction.options.getString("ends-at-timestamp") as string, { zone: guild?.timezone });
 	if(!endsAtDate.isValid) return await interaction.reply({ content: "Invalid date and/or time!", ephemeral: true });
 	if(endsAtDate.diff(DateTime.now()).toMillis() < 0) return await interaction.reply({ content: "Invalid date and/or time!", ephemeral: true });
+	if(interaction.options.getString("ends-at-timestamp")?.split("T").length == 1) endsAtDate = endsAtDate.set({ hour: 12, minute: 0, millisecond: 0 });
+	else endsAtDate = endsAtDate.set({ minute: 0, millisecond: 0 });
 
-	// *** Create new voting session ***
+	// * ===== Create new voting session =====
 	const newSessionId = fingerprintGenerator().toString();
 	// Create new options for the voting session
 	const newOptions = [];
@@ -128,7 +134,7 @@ async function createSession(interaction: ChatInputCommandInteraction) {
 			id: newSessionId,
 			number: (await DB.votingSession.count({ where: { guildId: interaction.guildId as string } })) + 1,
 			type: parseInt(interaction.options.getString("type") as string),
-			name: interaction.options.getString("name") as string,
+			question: interaction.options.getString("name") as string,
 			options: { create: newOptions },
 			closed: false,
 			createdAtTimestamp: DateTime.now().toMillis().toString(),
@@ -140,22 +146,10 @@ async function createSession(interaction: ChatInputCommandInteraction) {
 		}
 	});
 
-	// *** Create voting session message ***
-	const embed = new EmbedBuilder()
-		.setTitle(`Voting #${newSession.number}`)
-		.setDescription(`${newSession.name}`)
-		.setColor(0x00AAFF)
+	// Signal to event bus
+	eventbus.publish("voting.create", JSON.stringify(newSession));
 
-	const buttons = new ActionRowBuilder<ButtonBuilder>();
-	for(const option of newOptions) {
-		buttons.addComponents(new ButtonBuilder()
-			.setCustomId(`voting-${newSessionId}-${option.id}`)
-			.setLabel(option.content)
-			.setStyle(ButtonStyle.Primary));
-	}
-
-	const votingChannel = (interaction.guild?.channels.cache.get(guild.votingChannelId) as TextChannel) || interaction.guild?.systemChannel;
-	votingChannel.send({ embeds: [embed], components: [buttons] });
+	// Reply to original interaction
 	await interaction.reply(`Successfully created a new voting session **#${newSession.number}**!`);
 }
 
@@ -182,7 +176,6 @@ async function deleteSession(interaction: ChatInputCommandInteraction) {
 		where: { guildId: interaction.guildId as string, number: interaction.options.getInteger("session-number") as number  }
 	});
 	if(!targetSession) return await interaction.reply({ content: `Didn't find a voting session **#${interaction.options.getInteger("session-number")}**!`, ephemeral: true });
-	if(targetSession.closed) return await interaction.reply({ content: `Can't delete a session that's closed!`, ephemeral: true });
 
 	// Delete the voting session
 	await DB.votingSession.delete({
@@ -192,7 +185,7 @@ async function deleteSession(interaction: ChatInputCommandInteraction) {
 	await interaction.reply(`Successfully deleted voting session **#${targetSession.number}**!`);
 }
 
-const subcommandHandler: { [key: string]: (interaction: ChatInputCommandInteraction) => void } = {
+const subcommandHandler: { [key: string]: (interaction: ChatInputCommandInteraction, eventbus: EventBus) => void } = {
 	"list": listSessions,
 	"info": sessionInfo,
 	"create": createSession,
@@ -215,7 +208,7 @@ export default {
 		.addSubcommand(subcommand => subcommand
 			.setName("create")
 			.setDescription("Create a new voting session.")
-			.addStringOption(option => option.setName("type").setDescription("Voting session type.").addChoices({ name: "Yes/No", value: "0" }, { name: "Muti-choice", value: "1" }).setRequired(true))
+			.addStringOption(option => option.setName("type").setDescription("Voting session type.").addChoices({ name: "Yes/No", value: "0" }, { name: "Multichoice", value: "1" }).setRequired(true))
 			.addStringOption(option => option.setName("name").setDescription("Voting session name.").setRequired(true))
 			.addStringOption(option => option.setName("options").setDescription("Voting session options. Split options by ;;.").setRequired(true))
 			.addStringOption(option => option.setName("ends-at-timestamp").setDescription("Ends at date/time (ISO string).").setRequired(true)))
@@ -227,13 +220,13 @@ export default {
 			.setName("delete")
 			.setDescription("Delete an ongoing voting session.")
 			.addIntegerOption(option => option.setName("session-number").setDescription("The number of the voting session to delete.").setRequired(true))),
-	async execute(interaction: ChatInputCommandInteraction) {
+	async execute(interaction: ChatInputCommandInteraction, eventbus: EventBus) {
 		let subcommand = interaction.options.getSubcommand();
 		if(!(subcommand in subcommandHandler)) {
-			fmtLog("WARN", `Sub-command ${subcommand} for command ${interaction.commandName} not found!`);
+			fmtLog("ERROR", `Sub-command ${subcommand} for command ${interaction.commandName} not found!`);
 			await interaction.reply({ content: "Unknown sub-command!", ephemeral: true });
 			return;
 		}
-		await subcommandHandler[subcommand](interaction);
+		await subcommandHandler[subcommand](interaction, eventbus);
 	}
 };

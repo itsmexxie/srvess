@@ -47,6 +47,7 @@ export default {
 };
 
 export {
+	messageFormatter,
 	fmtLog,
 	fingerprintGenerator,
 	isBetween
