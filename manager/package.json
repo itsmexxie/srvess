@@ -1,5 +1,5 @@
 {
-	"name": "srvess-scheduler",
+	"name": "srvess-manager",
 	"version": "0.0.1",
 	"main": "./out/index.js",
 	"type": "module",
@@ -16,7 +16,6 @@
 		"@types/amqplib": "^0.10.0",
 		"@types/luxon": "^3.0.2",
 		"@types/node": "^18.11.3",
-		"@types/node-cron": "^3.0.6",
 		"prisma": "^4.7.1",
 		"typescript": "^4.8.4"
 	},
@@ -25,7 +24,6 @@
 		"amqplib": "^0.10.3",
 		"chalk": "^5.1.2",
 		"dotenv": "^16.0.3",
-		"luxon": "^3.0.4",
-		"node-cron": "^3.0.2"
+		"luxon": "^3.0.4"
 	}
 }

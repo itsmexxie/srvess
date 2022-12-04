@@ -3,6 +3,8 @@
 	"workspaces": [
 		"api",
 		"bot",
-		"scheduler"
+		"manager",
+		"scheduler",
+		"www"
 	]
 }

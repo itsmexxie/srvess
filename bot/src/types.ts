@@ -21,16 +21,8 @@ interface Command {
 	execute(interaction: ChatInputCommandInteraction, eventbus: EventBus): Promise<void>
 };
 
-interface Interaction {
-	data: {
-		type: string
-	},
-	handle(interaction: ChatInputCommandInteraction | ButtonInteraction, eventbus: EventBus): Promise<void>
-}
-
 export {
 	Event,
 	EventBusMessage,
-	Command,
-	Interaction
+	Command
 };

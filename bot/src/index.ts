@@ -9,8 +9,7 @@ import DB from "./db.js";
 import EventBus from "./eventbus.js";
 import EventManager from "./managers/event_manager.js";
 import CommandManager from "./managers/command_manager.js";
-import InteractionManager from "./managers/interaction_manager.js";
-import { fmtLog } from "./utils.js";
+import { fmtLog, fingerprintGenerator } from "./utils.js";
 import { EventBusMessage } from "./types.js";
 
 // Set default timezone to UTC
@@ -28,8 +27,46 @@ EVENTBUS.on("message", async (message: EventBusMessage) => {
 });
 
 CLIENT.on(discord.Events.InteractionCreate, async (interaction) => {
-	if(interaction.isChatInputCommand()) return await InteractionManager.interactions.get("chat_input_command")?.handle(interaction, EVENTBUS);
-	else if(interaction.isButton()) return await InteractionManager.interactions.get("button")?.handle(interaction, EVENTBUS);
+	if(interaction.isChatInputCommand()) {
+		let cmd = CommandManager.commands.get(interaction.commandName);
+		if(!cmd) return fmtLog("ERROR", `Unknown chat input interaction: **${interaction.commandName}**!`);
+
+		try {
+			await cmd.execute(interaction, EVENTBUS);
+		} catch(err) {
+			fmtLog("ERROR", err as string);
+			await interaction.reply({ content: "An unknown error occured while executing this command!", ephemeral: true });
+		}
+	}
+	else if(interaction.isButton()) {
+		let args = interaction.customId.split("-");
+		switch(args[0]) {
+			case "voting":
+				try {
+					await DB.vote.create({
+						data: {
+							userId: (await DB.user.upsert({
+								where: { discordId: interaction.user.id },
+								update: {},
+								create: {
+									id: fingerprintGenerator().toString(),
+									discordId: interaction.user.id
+								}
+							})).id,
+							votingSessionId: args[1],
+							votingOptionId: args[2]
+						}
+					});
+					interaction.reply({ content: "Thank you for voting!", ephemeral: true });
+				} catch(err) {
+					interaction.reply({ content: "You can only vote once!", ephemeral: true });
+				}
+				break;
+
+			default:
+				break;
+		}
+	}
 	else {
 		fmtLog("WARN", `Couldn't handle that type of interaction *(${interaction.type})*.`);
 		return;
@@ -56,7 +93,6 @@ async function main() {
 	try {
 		await EventManager.loadEvents();
 		await CommandManager.registerCommands(REST);
-		await InteractionManager.loadInteractions();
 		await EVENTBUS.connect(process.env.RABBITMQ_ADDRESS as string, process.env.RABBITMQ_USERNAME || "", process.env.RABBITMQ_PASSWORD || "");
 		await CLIENT.login(process.env.DISCORD_BOT_TOKEN);
 		fmtLog("INFO", `Microservice **${process.env.MICROSERVICE_NAME}** successfully started!`);
