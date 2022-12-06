@@ -21,8 +21,9 @@ const CLIENT = new discord.Client({ intents: [discord.GatewayIntentBits.Guilds] 
 const REST = new discord.REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN as string);
 
 EVENTBUS.on("message", async (message: EventBusMessage) => {
+	fmtLog("INFO", `Incoming message from topic **${message.key}**: ${JSON.stringify(message.content)}`);
 	const event = EventManager.events.get(message.key.split(".")[1]);
-	if(!event) return fmtLog("ERROR", `Unknown event namespace: *${message.key.split(".")[1]}*`);
+	if(!event) return fmtLog("ERROR", `Unknown event namespace: **${message.key.split(".")[1]}**!`);
 	await event.handle(CLIENT, message);
 });
 

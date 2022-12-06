@@ -49,9 +49,9 @@ class EventBus extends EventEmitter {
 		}
 	}
 
-	async publish(topic: string, message: string) {
+	async publish(key: string, message: string) {
 		if(!this.connection || !this.channel) throw("Can't publish to EventBus without a connection!");
-		this.channel?.publish(this.exchange, `${process.env.RABBITMQ_PREFIX}.${topic}`, Buffer.from(message));
+		this.channel?.publish(this.exchange, `${process.env.MICROSERVICE_NAME}.${key}`, Buffer.from(message));
 		fmtLog("INFO", `Published a message to EventBus: ${message}`);
 	}
 }

@@ -1,4 +1,4 @@
-import { Client, ChatInputCommandInteraction, ButtonInteraction } from "discord.js";
+import { ChatInputCommandInteraction, Client } from "discord.js";
 import EventBus from "./eventbus.js";
 
 interface Event {

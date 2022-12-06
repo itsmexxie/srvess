@@ -8,23 +8,24 @@ import { DateTime, Settings as LuxonSettings } from "luxon";
 import DB from "./db.js";
 import EventBus from "./eventbus.js";
 import { fmtLog } from "./utils.js";
+import { EventBusMessage } from "./types";
 
 // Set default timezone to UTC
 LuxonSettings.defaultZone = "UTC";
 
 // Initialize stuff
 const EVENTBUS = new EventBus(process.env.RABBITMQ_EXCHANGE as string, process.env.RABBITMQ_KEY?.split(":"));
-const CRONTAB = cron.schedule("0 * * * *", async () => {
+cron.schedule("0 * * * *", async () => {
 	fmtLog("INFO", "Running cron job.");
 	const timestamp = DateTime.now().set({ second: 0, millisecond: 0 }).toUnixInteger().toString() + "000";
-	const votingSessions = await DB.votingSession.findMany({ where: { endsAtTimestamp: timestamp }, select: { id: true } });
+	const votingSessions = await DB.votingSession.findMany({ where: { endsAtTimestamp: timestamp }, include: { options: true } });
 	for(const session of votingSessions) {
 		EVENTBUS.publish("voting.close", JSON.stringify(session));
 	}
 });
 
-EVENTBUS.on("message", (message) => {
-	console.log(message);
+EVENTBUS.on("message", (message: EventBusMessage) => {
+	fmtLog("INFO", `Incoming message from topic **${message.key}**: ${JSON.stringify(message.content)}`);
 });
 
 

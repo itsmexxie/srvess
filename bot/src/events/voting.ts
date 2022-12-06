@@ -10,7 +10,7 @@ async function actionCreate(client: Client, message: EventBusMessage) {
 
 	// * ===== Create voting session message ======
 	const embed = new EmbedBuilder()
-		.setTitle(`Voting #${message.content.number}`)
+		.setTitle(`Voting session #${message.content.number}`)
 		.setColor(0x00AAFF)
 		.addFields({ name: "Question:", value: message.content.question })
 		.setFooter({ text: `Ends at ${DateTime.fromMillis(parseInt(message.content.endsAtTimestamp), { zone: guild.timezone }).toFormat("MMMM dd, yyyy - HH:mm")}` });
@@ -18,15 +18,15 @@ async function actionCreate(client: Client, message: EventBusMessage) {
 
 	let optionsString = "";
 	for(let i = 0; i < message.content.options.length; i++) {
-		let votingGlyph = JSON.parse(guild.votingGlyphs)[message.content.type][i];
+		let optionGlyph = JSON.parse(guild.votingGlyphs)[message.content.type][i];
 
-		optionsString += `${votingGlyph} **${message.content.options[i].content}**`;
+		optionsString += `${optionGlyph} **${message.content.options[i].content}**`;
 		if(i != (message.content.options.length - 1)) optionsString += "\n";
 
 		buttons.addComponents(new ButtonBuilder()
 			.setCustomId(`voting-${message.content.id}-${message.content.options[i].id}`)
 			.setLabel(message.content.options[i].content)
-			.setEmoji(votingGlyph)
+			.setEmoji(optionGlyph)
 			.setStyle(ButtonStyle.Primary));
 	}
 	embed.addFields({ name: "Options:", value: optionsString });
@@ -38,18 +38,30 @@ async function actionCreate(client: Client, message: EventBusMessage) {
 
 async function actionClose(client: Client, message: EventBusMessage) {
 	// Get voting session and guild info
-	const votingSession = (await DB.votingSession.findUnique({ where: { id: message.content.id } }))!;
-	const guild = (await DB.guild.findUnique({ where: { id: votingSession.guildId } }))!;
+	const guild = (await DB.guild.findUnique({ where: { id: message.content.guildId } }))!;
 
 	// Close the voting session
-	DB.votingSession.update({ where: { id: votingSession.id }, data: { closed: true } });
+	console.log(message.content.id);
+	await DB.votingSession.update({ where: { id: message.content.id }, data: { closed: true } });
 
 	// Create the voting results embed
 	const embed = new EmbedBuilder()
-		.setTitle(`Voting #${votingSession.number} | RESULTS`)
-		.setColor(0x00FF00);
+		.setTitle(`Voting session #${message.content.number} ended, here are the results!`)
+		.setColor(0x00FF00)
+		.addFields({ name: "Question:", value: message.content.question })
+		.setFooter({ text: `Ended at ${DateTime.fromMillis(parseInt(message.content.endsAtTimestamp), { zone: guild.timezone }).toFormat("MMMM dd, yyyy - HH:mm")}` });
 
-	// Send the voting results embed
+	let optionsString = "";
+	let totalVotes = await DB.vote.count({ where: { votingSessionId: message.content.id } });
+	for(let i = 0; i < message.content.options.length; i++) {
+		let optionGlyph = JSON.parse(guild.votingGlyphs)[message.content.type][i];
+		let optionVotes = await DB.vote.count({ where: { votingSessionId: message.content.id, votingOptionId: message.content.options[i].id } });
+		optionsString += `${optionGlyph} **${message.content.options[i].content}** - ${optionVotes} (${totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toPrecision(3) : 0}%)`;
+		if(i != (message.content.options.length - 1)) optionsString += "\n";
+	}
+	embed.addFields({ name: "Options:", value: optionsString });
+
+	// Get voting channel and send the embed
 	const votingChannel = (client.guilds.cache.get(guild.id)?.channels.cache.get(guild.votingChannelId) as TextChannel) || client.guilds.cache.get(guild.id)?.systemChannel;
 	votingChannel.send({ embeds: [embed] });
 }

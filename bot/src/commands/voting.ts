@@ -72,7 +72,7 @@ async function sessionInfo(interaction: ChatInputCommandInteraction) {
 
 	// Create message
 	const embed = new EmbedBuilder()
-		.setTitle(`Voting #${votingSession.number} | INFO`)
+		.setTitle(`Voting session #${votingSession.number} | INFO`)
 		.setColor(0x00AAFF)
 		.addFields([
 			{ name: "Question:", value: votingSession.question },
@@ -88,15 +88,16 @@ async function sessionInfo(interaction: ChatInputCommandInteraction) {
 			optionsString += `${JSON.parse(guild.votingGlyphs)[votingSession.type][i]} **${votingSession.options[i].content}** - ${optionVotes} (${totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toPrecision(3) : 0}%)`;
 			if(i != (votingSession.options.length - 1)) optionsString += "\n";
 		}
-		embed.setFooter({ text: "Wait for the session to close to see the results!"});
 	} else {
 		for(let i = 0; i < votingSession.options.length; i++) {
 			optionsString += `${JSON.parse(guild.votingGlyphs)[votingSession.type][i]} **${votingSession.options[i].content}**`;
 			if(i != (votingSession.options.length - 1)) optionsString += "\n";
 		}
+		embed.setFooter({ text: "Wait for the session to close to see the results!"});
 	}
 	embed.addFields({ name: "Options:", value: optionsString });
 
+	// Reply to original interaction
 	await interaction.reply({ embeds: [embed] });
 }
 
@@ -153,7 +154,7 @@ async function createSession(interaction: ChatInputCommandInteraction, eventbus:
 	await interaction.reply(`Successfully created a new voting session **#${newSession.number}**!`);
 }
 
-async function closeSession(interaction: ChatInputCommandInteraction) {
+async function closeSession(interaction: ChatInputCommandInteraction, eventbus: EventBus) {
 	// Find the target session and test if it's not already closed
 	const targetSession = await DB.votingSession.findFirst({
 		where: { guildId: interaction.guildId as string, number: interaction.options.getInteger("session-number") as number  }
@@ -167,6 +168,11 @@ async function closeSession(interaction: ChatInputCommandInteraction) {
 		data: { closed: true }
 	});
 
+
+	// Signal to event bus
+	eventbus.publish("voting.close", JSON.stringify(targetSession));
+
+	// Reply to original interaction
 	await interaction.reply(`Successfully closed voting session **#${targetSession.number}**!`);
 }
 
